@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from .parsebench_compat import build_compatibility_profile
+
 
 CONTENT_RULE_TYPES = {
     "missing_sentence_percent",
@@ -371,41 +373,45 @@ def generate_document(
     source: SourceDocument,
     *,
     department: str,
-    difficulty: str,
-    document_type: str,
+    compatibility_profile: dict[str, Any] | None = None,
 ) -> GeneratedDocument:
-    sentences = extract_sentences(source.markdown)
-    words = extract_words(source.markdown)
-    sentence_bag = dict(Counter(sentences))
-    word_bag = dict(Counter(words))
-    digit_bag = dict(Counter(ch for ch in "\n".join(_plain_blocks(source.markdown)) if ch.isdigit()))
+    profile = compatibility_profile or build_compatibility_profile(source.markdown)
+    sentences = list(profile["sentences"])
+    sentence_missing = dict(profile["sentence_missing"])
+    sentence_unexpected = dict(profile["sentence_unexpected"])
+    sentence_too_many = dict(profile["sentence_too_many"])
+    word_missing = dict(profile["word_missing"])
+    word_unexpected = dict(profile["word_unexpected"])
+    word_too_many = dict(profile["word_too_many"])
+    digit_bag = dict(profile["digits"])
     tables, html_gold = extract_tables(source.markdown)
     formatting, hierarchy = _extract_formatting(source.markdown)
 
-    tags = [f"department_{slugify(department)}", slugify(document_type, "misc"), difficulty]
+    tags = [f"department_{slugify(department)}"]
     raw_rules: list[tuple[str, dict[str, Any]]] = []
-    if sentence_bag:
-        raw_rules.extend(
-            (rule_type, {"bag_of_sentence": sentence_bag})
-            for rule_type in (
-                "missing_sentence_percent",
+    if sentence_missing:
+        raw_rules.append(("missing_sentence_percent", {"bag_of_sentence": sentence_missing}))
+    if sentence_unexpected:
+        raw_rules.append(
+            (
                 "unexpected_sentence_percent",
-                "too_many_sentence_occurence_percent",
+                {"bag_of_sentence": sentence_unexpected, "original_md": source.markdown},
             )
         )
-    if word_bag:
-        raw_rules.extend(
-            (rule_type, {"bag_of_word": word_bag})
-            for rule_type in (
-                "missing_word_percent",
-                "unexpected_word_percent",
-                "too_many_word_occurence_percent",
-            )
+    if sentence_too_many:
+        raw_rules.append(
+            ("too_many_sentence_occurence_percent", {"bag_of_sentence": sentence_too_many})
         )
+    if word_missing:
+        raw_rules.append(("missing_word_percent", {"bag_of_word": word_missing}))
+    if word_unexpected:
+        raw_rules.append(("unexpected_word_percent", {"bag_of_word": word_unexpected}))
+    if word_too_many:
+        raw_rules.append(("too_many_word_occurence_percent", {"bag_of_word": word_too_many}))
     if digit_bag:
         raw_rules.append(("bag_of_digit_percent", {"bag_of_digit": digit_bag}))
     raw_rules.extend(("missing_specific_sentence", {"sentence": sentence}) for sentence in dict.fromkeys(sentences))
-    raw_rules.extend(("missing_specific_word", {"word": word}) for word in dict.fromkeys(words))
+    raw_rules.extend(("missing_specific_word", {"word": word}) for word in word_missing)
     raw_rules.extend(
         ("order", {"before": before, "after": after, "max_diffs": 0})
         for before, after in zip(sentences, sentences[1:])
@@ -437,8 +443,7 @@ def generate_document(
         "metadata": {
             "source": "construct-dataset-webserver",
             "department": department,
-            "document_type": document_type,
-            "difficulty": difficulty,
+            "compatibility_target": profile.get("compatibility_target"),
             "gold_markdown_sha256": hashlib.sha256(source.markdown.encode("utf-8")).hexdigest(),
             "pdf_sha256": hashlib.sha256(source.pdf_bytes).hexdigest(),
         },
@@ -459,7 +464,7 @@ def generate_document(
         "formatting_rules": sum(r["type"] in FORMATTING_RULE_TYPES for r in rules),
         "tables": len(tables),
         "sentences": len(sentences),
-        "words": len(words),
+        "words": sum(word_missing.values()),
     }
     return GeneratedDocument(
         source=source,
@@ -521,7 +526,6 @@ def compile_dataset(
 ) -> bytes:
     if mode not in {"full", "sidecar", "jsonl"}:
         raise DatasetValidationError("导出模式无效")
-    department_slug = slugify(department)
     content_rows: list[dict[str, Any]] = []
     formatting_rows: list[dict[str, Any]] = []
     table_rows: list[dict[str, Any]] = []
@@ -533,7 +537,7 @@ def compile_dataset(
         sidecar = sidecars.get(stem, document.sidecar)
         validate_sidecar(sidecar, stem)
         tags = sidecar.get("tags") if isinstance(sidecar.get("tags"), list) else []
-        pdf_rel = f"docs/{department_slug}/{document.source.pdf_name}"
+        pdf_rel = document.source.pdf_name
         for rule in sidecar["test_rules"]:
             if rule["id"] in all_ids:
                 raise DatasetValidationError(f"全局规则 id 重复: {rule['id']}")
@@ -569,15 +573,11 @@ def compile_dataset(
             )
         manifest.append(
             {
-                "document_id": f"{department_slug}/{stem}",
+                "document_id": stem,
                 "department": department,
                 "pdf": pdf_rel,
                 "gold_markdown": (
-                    f"sidecar/{department_slug}/{document.source.md_name}"
-                    if mode == "full"
-                    else f"{department_slug}/{document.source.md_name}"
-                    if mode == "sidecar"
-                    else None
+                    document.source.md_name if mode in {"full", "sidecar"} else None
                 ),
                 "pdf_sha256": hashlib.sha256(document.source.pdf_bytes).hexdigest(),
                 "gold_md_sha256": hashlib.sha256(document.source.markdown.encode("utf-8")).hexdigest(),
@@ -611,26 +611,21 @@ def compile_dataset(
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        # Every export is intentionally flat: PDFs and all generated artifacts
+        # live at the ZIP root, matching the consuming evaluation system.
+        for document in documents:
+            archive.writestr(document.source.pdf_name, document.source.pdf_bytes)
         if mode in {"full", "sidecar"}:
-            prefix = "sidecar/" if mode == "full" else ""
             for document in documents:
-                folder = f"{prefix}{department_slug}/"
-                archive.writestr(folder + document.source.pdf_name, document.source.pdf_bytes)
-                archive.writestr(folder + document.source.md_name, document.source.markdown.encode("utf-8"))
+                archive.writestr(document.source.md_name, document.source.markdown.encode("utf-8"))
                 archive.writestr(
-                    folder + f"{document.source.stem}.test.json",
+                    f"{document.source.stem}.test.json",
                     (json.dumps(sidecars.get(document.source.stem, document.sidecar), ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
                 )
         if mode in {"full", "jsonl"}:
-            prefix = "parsebench_jsonl/" if mode == "full" else ""
-            for document in documents:
-                archive.writestr(
-                    f"{prefix}docs/{department_slug}/{document.source.pdf_name}",
-                    document.source.pdf_bytes,
-                )
-            archive.writestr(prefix + "text_content.jsonl", lines(content_rows))
-            archive.writestr(prefix + "text_formatting.jsonl", lines(formatting_rows))
-            archive.writestr(prefix + "table.jsonl", lines(table_rows))
+            archive.writestr("text_content.jsonl", lines(content_rows))
+            archive.writestr("text_formatting.jsonl", lines(formatting_rows))
+            archive.writestr("table.jsonl", lines(table_rows))
         archive.writestr(
             "manifest.jsonl",
             lines(manifest),
@@ -640,4 +635,3 @@ def compile_dataset(
             (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
         )
     return buffer.getvalue()
-

@@ -32,7 +32,7 @@ h1 { margin: 2px 0 0; font-size: 18px; }
 .section-head p { margin: 0; color: var(--muted); font-size: 13px; }
 .step { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: var(--green); background: var(--mint); font-size: 12px; font-weight: 900; }
 form { padding: 28px; }
-.meta-grid { display: grid; grid-template-columns: 2fr 1.2fr 1fr .8fr; gap: 14px; margin-bottom: 20px; }
+.meta-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 14px; margin-bottom: 20px; }
 label { color: #46514f; font-size: 12px; font-weight: 750; }
 input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: #fbfcfb; font: inherit; outline: none; }
 input, select { height: 44px; margin-top: 7px; padding: 0 13px; }
@@ -85,4 +85,3 @@ textarea { min-height: 340px; padding: 15px; resize: vertical; font: 12px/1.55 "
 #toast.error { background: #9a352e; }
 @media (max-width: 850px) { .hero { display: block; } .flow { width: max-content; margin-top: 24px; } .meta-grid { grid-template-columns: 1fr 1fr; } .metrics { grid-template-columns: 1fr 1fr; } .export-bar { flex-wrap: wrap; } .export-bar > div { flex-basis: 100%; } }
 @media (max-width: 560px) { .shell { width: min(100% - 20px, 1180px); } .topbar { padding: 0 14px; } .status-pill { display: none; } .hero { padding-top: 35px; } .drop-grid, .meta-grid { grid-template-columns: 1fr; } .section-head { align-items: flex-start; gap: 10px; } .section-head > p { display: none; } form, .documents { padding: 18px; } .metrics { grid-template-columns: 1fr 1fr; } .rule-badges { display: none; } }
-

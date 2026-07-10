@@ -30,7 +30,7 @@ def test_pair_uploads_matches_case_insensitively():
 
 
 def test_generate_supported_dimensions():
-    result = generate_document(source(), department="QA", difficulty="easy", document_type="misc")
+    result = generate_document(source(), department="QA")
     types = {rule["type"] for rule in result.sidecar["test_rules"]}
     assert "missing_sentence_percent" in types
     assert "is_title" in types
@@ -38,28 +38,37 @@ def test_generate_supported_dimensions():
     assert "is_italic" in types
     assert "is_code_block" in types
     assert result.table_markdown and "<table>" in result.table_markdown
+    unexpected = next(
+        rule for rule in result.sidecar["test_rules"]
+        if rule["type"] == "unexpected_sentence_percent"
+    )
+    assert unexpected["original_md"] == MARKDOWN
 
 
 def test_compile_full_zip():
-    result = generate_document(source(), department="QA", difficulty="easy", document_type="misc")
+    result = generate_document(source(), department="QA")
     payload = compile_dataset(
         [result], {"test": result.sidecar}, dataset_name="demo", department="QA", mode="full"
     )
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = set(archive.namelist())
-        assert "sidecar/qa/test.test.json" in names
-        assert "parsebench_jsonl/text_content.jsonl" in names
-        assert "parsebench_jsonl/text_formatting.jsonl" in names
-        assert "parsebench_jsonl/table.jsonl" in names
-        content = archive.read("parsebench_jsonl/text_content.jsonl").decode()
+        assert "test.pdf" in names
+        assert "test.md" in names
+        assert "test.test.json" in names
+        assert "text_content.jsonl" in names
+        assert "text_formatting.jsonl" in names
+        assert "table.jsonl" in names
+        assert all("/" not in name for name in names)
+        content = archive.read("text_content.jsonl").decode()
         first = json.loads(content.splitlines()[0])
         assert first["category"] == "text_content"
+        assert first["pdf"] == "test.pdf"
         assert isinstance(first["rule"], str)
 
 
 
 def test_edited_sidecar_is_table_source_of_truth():
-    result = generate_document(source(), department="QA", difficulty="easy", document_type="misc")
+    result = generate_document(source(), department="QA")
     sidecar = dict(result.sidecar)
     sidecar["expected_markdown"] = "<table><tr><td>edited</td></tr></table>"
     payload = compile_dataset(

@@ -23,6 +23,10 @@ from .generator import (
     pair_uploads,
     slugify,
 )
+from .parsebench_compat import (
+    ParseBenchCompatibilityError,
+    build_compatibility_profiles,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -74,6 +78,11 @@ async def validation_error_handler(_, exc: DatasetValidationError) -> JSONRespon
     return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
+@app.exception_handler(ParseBenchCompatibilityError)
+async def compatibility_error_handler(_, exc: ParseBenchCompatibilityError) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(BASE_DIR / "static" / "index.html")
@@ -90,13 +99,9 @@ async def analyze(
     md_files: list[UploadFile] = File(...),
     dataset_name: str = Form("custom_parsebench_dataset"),
     department: str = Form("default"),
-    difficulty: str = Form("easy"),
-    document_type: str = Form("misc"),
 ) -> dict[str, Any]:
     dataset_name = dataset_name.strip() or "custom_parsebench_dataset"
     department = department.strip() or "default"
-    if difficulty not in {"easy", "hard"}:
-        raise DatasetValidationError("difficulty 必须是 easy 或 hard")
     if len(pdf_files) > 200 or len(md_files) > 200:
         raise DatasetValidationError("单次最多上传 200 对文件")
     pdf_payloads: list[tuple[str, bytes]] = []
@@ -113,14 +118,14 @@ async def analyze(
     if total_bytes > 500 * 1024 * 1024:
         raise DatasetValidationError("单次上传总大小不能超过 500 MB")
     sources = pair_uploads(pdf_payloads, md_payloads)
+    profiles = build_compatibility_profiles([source.markdown for source in sources])
     documents = [
         generate_document(
             source,
             department=department,
-            difficulty=difficulty,
-            document_type=document_type,
+            compatibility_profile=profile,
         )
-        for source in sources
+        for source, profile in zip(sources, profiles)
     ]
     session_id = uuid.uuid4().hex
     with _session_lock:
@@ -181,4 +186,3 @@ def export_dataset(session_id: str, payload: ExportPayload, mode: str = "full") 
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
