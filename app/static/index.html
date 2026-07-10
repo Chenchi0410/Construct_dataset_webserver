@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ParseBench Dataset Builder</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark">PB</div>
+    <div>
+      <div class="eyebrow">DATASET WORKBENCH</div>
+      <h1>ParseBench 数据集构建器</h1>
+    </div>
+    <div class="status-pill"><span></span> 本地服务</div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="kicker">PDF + GOLD MARKDOWN → SIDECAR + JSONL</p>
+        <h2>把部门黄金数据，编译成可交付的评测集。</h2>
+        <p>同名配对、规则预览、人工修订、结构校验与完整 ZIP 导出，在一个流程里完成。</p>
+      </div>
+      <div class="flow" aria-label="构建流程">
+        <span>上传</span><i>→</i><span>生成</span><i>→</i><span>确认</span><i>→</i><span>导出</span>
+      </div>
+    </section>
+
+    <section class="panel upload-panel">
+      <div class="section-head">
+        <div><span class="step">01</span><h3>创建构建任务</h3></div>
+        <p>PDF 与 Markdown 必须使用相同文件名。</p>
+      </div>
+      <form id="build-form">
+        <div class="meta-grid">
+          <label>数据集名称<input name="dataset_name" value="department_parsebench_dataset" required></label>
+          <label>部门标识<input name="department" value="default" required></label>
+          <label>文档类型<input name="document_type" value="misc" required></label>
+          <label>难度<select name="difficulty"><option value="easy">easy</option><option value="hard">hard</option></select></label>
+        </div>
+        <div class="drop-grid">
+          <label class="dropzone" id="pdf-zone">
+            <input id="pdf-input" name="pdf_files" type="file" accept=".pdf,application/pdf" multiple required>
+            <span class="file-icon">PDF</span>
+            <strong>选择或拖入 PDF</strong>
+            <small id="pdf-summary">支持单个或批量上传</small>
+          </label>
+          <label class="dropzone" id="md-zone">
+            <input id="md-input" name="md_files" type="file" accept=".md,.markdown,text/markdown" multiple required>
+            <span class="file-icon md">MD</span>
+            <strong>选择或拖入 Gold Markdown</strong>
+            <small id="md-summary">UTF-8 编码，名称需与 PDF 一致</small>
+          </label>
+        </div>
+        <div id="pairing" class="pairing hidden"></div>
+        <button class="primary" type="submit"><span>分析并生成规则</span><b>→</b></button>
+      </form>
+    </section>
+
+    <section id="result" class="panel result-panel hidden">
+      <div class="section-head">
+        <div><span class="step">02</span><h3>检查生成结果</h3></div>
+        <p>JSON 编辑内容将作为 JSONL 的唯一编译来源。</p>
+      </div>
+      <div id="metrics" class="metrics"></div>
+      <div id="documents" class="documents"></div>
+      <div class="export-bar">
+        <div><strong>规则确认完成</strong><small>导出前会再次执行结构和 ID 校验。</small></div>
+        <button data-mode="sidecar" class="secondary">Sidecar ZIP</button>
+        <button data-mode="jsonl" class="secondary">JSONL ZIP</button>
+        <button data-mode="full" class="primary compact">完整测试集 ZIP</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
