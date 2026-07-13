@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import io
+import os
 import re
-import tempfile
+import shutil
 import time
 import uuid
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
@@ -54,6 +57,60 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 _sessions: dict[str, BuildSession] = {}
 _session_lock = Lock()
+_publish_lock = Lock()
+
+
+def _shared_dataset_dir() -> Path:
+    configured = os.environ.get("SHARED_DATASET_DIR")
+    path = Path(configured).expanduser() if configured else BASE_DIR.parent / "shared_datasets"
+    return path.resolve()
+
+
+def _compile_session(session: BuildSession, payload: ExportPayload, *, mode: str) -> bytes:
+    sidecars = payload.sidecars or {doc.source.stem: doc.sidecar for doc in session.documents}
+    unknown = set(sidecars) - {doc.source.stem for doc in session.documents}
+    if unknown:
+        raise DatasetValidationError("包含未知文档的 Sidecar: " + ", ".join(sorted(unknown)))
+    for doc in session.documents:
+        if doc.source.stem not in sidecars:
+            sidecars[doc.source.stem] = doc.sidecar
+    return compile_dataset(
+        session.documents,
+        sidecars,
+        dataset_name=session.dataset_name,
+        department=session.department,
+        mode=mode,
+    )
+
+
+def _publish_archive(data: bytes, dataset_id: str) -> Path:
+    root = _shared_dataset_dir()
+    staging_root = root / ".staging"
+    target = root / dataset_id
+    temporary = staging_root / uuid.uuid4().hex
+
+    try:
+        staging_root.mkdir(parents=True, exist_ok=True)
+        temporary.mkdir()
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            for info in archive.infolist():
+                # The evaluator expects a flat dataset directory. Rejecting paths also
+                # prevents an archive member from escaping the staging directory.
+                if info.is_dir() or Path(info.filename).name != info.filename:
+                    raise DatasetValidationError(f"发布包包含无效路径: {info.filename}")
+                (temporary / info.filename).write_bytes(archive.read(info))
+
+        with _publish_lock:
+            if target.exists():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"数据集 {dataset_id} 已存在，请修改数据集名称或使用新版本号后重试",
+                )
+            temporary.rename(target)
+        return target
+    except Exception:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
 
 
 def _cleanup_sessions() -> None:
@@ -90,7 +147,12 @@ def index() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "parsebench-dataset-builder", "version": app.version}
+    return {
+        "status": "ok",
+        "service": "parsebench-dataset-builder",
+        "version": app.version,
+        "shared_dataset_dir": str(_shared_dataset_dir()),
+    }
 
 
 @app.post("/api/analyze")
@@ -164,20 +226,7 @@ async def analyze(
 @app.post("/api/export/{session_id}")
 def export_dataset(session_id: str, payload: ExportPayload, mode: str = "full") -> Response:
     session = _get_session(session_id)
-    sidecars = payload.sidecars or {doc.source.stem: doc.sidecar for doc in session.documents}
-    unknown = set(sidecars) - {doc.source.stem for doc in session.documents}
-    if unknown:
-        raise DatasetValidationError("包含未知文档的 Sidecar: " + ", ".join(sorted(unknown)))
-    for doc in session.documents:
-        if doc.source.stem not in sidecars:
-            sidecars[doc.source.stem] = doc.sidecar
-    data = compile_dataset(
-        session.documents,
-        sidecars,
-        dataset_name=session.dataset_name,
-        department=session.department,
-        mode=mode,
-    )
+    data = _compile_session(session, payload, mode=mode)
     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", session.dataset_name).strip("._") or "dataset"
     suffix = {"full": "complete", "sidecar": "sidecar", "jsonl": "jsonl"}.get(mode, mode)
     filename = f"{safe_name}_{suffix}.zip"
@@ -186,3 +235,25 @@ def export_dataset(session_id: str, payload: ExportPayload, mode: str = "full") 
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.post("/api/publish/{session_id}", status_code=201)
+def publish_dataset(session_id: str, payload: ExportPayload) -> dict[str, Any]:
+    session = _get_session(session_id)
+    dataset_id = slugify(session.dataset_name, fallback="dataset")
+    data = _compile_session(session, payload, mode="full")
+    try:
+        target = _publish_archive(data, dataset_id)
+    except HTTPException:
+        raise
+    except (DatasetValidationError, OSError, zipfile.BadZipFile):
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"发布数据集失败: {exc}") from exc
+    return {
+        "published": True,
+        "dataset_id": dataset_id,
+        "dataset_name": session.dataset_name,
+        "documents": len(session.documents),
+        "path": str(target),
+    }

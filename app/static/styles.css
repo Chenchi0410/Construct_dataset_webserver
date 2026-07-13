@@ -79,6 +79,8 @@ textarea { min-height: 340px; padding: 15px; resize: vertical; font: 12px/1.55 "
 .secondary { border: 1px solid #c7d2cc; background: white; }
 .secondary:hover { border-color: var(--green); color: var(--green); }
 .compact { color: white; background: var(--green); }
+.publish { background: #173f8a; }
+.publish:hover { background: #102f69; }
 .hidden { display: none !important; }
 #toast { position: fixed; right: 24px; bottom: 24px; z-index: 10; max-width: 440px; padding: 13px 16px; border-radius: 12px; color: white; background: var(--ink); box-shadow: var(--shadow); opacity: 0; transform: translateY(12px); pointer-events: none; transition: .2s ease; }
 #toast.show { opacity: 1; transform: translateY(0); }

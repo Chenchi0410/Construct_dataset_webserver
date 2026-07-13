@@ -126,3 +126,39 @@ document.querySelectorAll('[data-mode]').forEach(button => button.addEventListen
   } finally { button.disabled = false; }
 }));
 
+function collectSidecars() {
+  const sidecars = {};
+  document.querySelectorAll('.document').forEach(node => {
+    sidecars[node.dataset.stem] = JSON.parse(node.querySelector('textarea').value);
+  });
+  return sidecars;
+}
+
+document.querySelector('#publish-button').addEventListener('click', async event => {
+  if (!activeSession) return;
+  const button = event.currentTarget;
+  let sidecars;
+  try {
+    sidecars = collectSidecars();
+  } catch (error) {
+    notify(`Sidecar JSON 格式错误：${error.message}`, true);
+    return;
+  }
+  button.disabled = true;
+  button.textContent = '正在发布…';
+  try {
+    const response = await fetch(`/api/publish/${activeSession.session_id}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sidecars}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || '发布失败');
+    notify(`数据集 ${data.dataset_id} 已发布到评测系统`);
+  } catch (error) {
+    notify(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = '发布到评测系统';
+  }
+});

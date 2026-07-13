@@ -44,6 +44,27 @@ python -m venv .venv
 - `GET /api/health`：服务状态。
 - `POST /api/analyze`：上传 `pdf_files`、`md_files`，生成 Sidecar 草稿。
 - `POST /api/export/{session_id}?mode=full|sidecar|jsonl`：根据确认后的 Sidecar 导出 ZIP。
+- `POST /api/publish/{session_id}`：将完整评测集原子发布到共享目录；同名数据集不会被覆盖。
+
+## 发布到共享目录
+
+共享目录通过环境变量 `SHARED_DATASET_DIR` 配置，无需因操作系统变化修改代码。未配置时，默认使用项目根目录下的 `shared_datasets`。
+
+Windows PowerShell 示例：
+
+```powershell
+$env:SHARED_DATASET_DIR = "D:\md-platform\datasets"
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Ubuntu 示例：
+
+```bash
+export SHARED_DATASET_DIR=/srv/md-platform/datasets
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8102
+```
+
+正式部署时建议在 systemd 服务的 `Environment=` 中设置该变量，并让数据集构建服务对目录具有写权限、评测服务具有只读权限。发布过程先写入共享目录内的 `.staging`，完成后再原子重命名；已有同名目录时会拒绝覆盖，因此新版本应使用新的数据集名称（例如 `department_contract_v2`）。
 
 ## 兼容性回归测试
 
