@@ -14,7 +14,7 @@ from threading import Lock
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -34,6 +34,8 @@ from .parsebench_compat import (
 
 BASE_DIR = Path(__file__).resolve().parent
 SESSION_TTL_SECONDS = 2 * 60 * 60
+WEB_PREFIX = "/dataset-builder"
+API_PREFIX = "/api/dataset-builder"
 
 
 @dataclass(slots=True)
@@ -52,8 +54,16 @@ app = FastAPI(
     title="ParseBench Dataset Builder",
     version="1.0.0",
     description="将同名 PDF 与黄金 Markdown 编译为 Sidecar 和 ParseBench JSONL 数据集。",
+    docs_url=f"{API_PREFIX}/docs",
+    openapi_url=f"{API_PREFIX}/openapi.json",
+    redoc_url=f"{API_PREFIX}/redoc",
+    swagger_ui_oauth2_redirect_url=f"{API_PREFIX}/docs/oauth2-redirect",
 )
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+app.mount(
+    f"{WEB_PREFIX}/static",
+    StaticFiles(directory=BASE_DIR / "static"),
+    name="dataset-builder-static",
+)
 
 _sessions: dict[str, BuildSession] = {}
 _session_lock = Lock()
@@ -141,11 +151,16 @@ async def compatibility_error_handler(_, exc: ParseBenchCompatibilityError) -> J
 
 
 @app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url=f"{WEB_PREFIX}/", status_code=307)
+
+
+@app.get(f"{WEB_PREFIX}/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(BASE_DIR / "static" / "index.html")
 
 
-@app.get("/api/health")
+@app.get(f"{API_PREFIX}/health")
 def health() -> dict[str, Any]:
     return {
         "status": "ok",
@@ -155,7 +170,7 @@ def health() -> dict[str, Any]:
     }
 
 
-@app.post("/api/analyze")
+@app.post(f"{API_PREFIX}/analyze")
 async def analyze(
     pdf_files: list[UploadFile] = File(...),
     md_files: list[UploadFile] = File(...),
@@ -223,7 +238,7 @@ async def analyze(
     }
 
 
-@app.post("/api/export/{session_id}")
+@app.post(f"{API_PREFIX}/export/{{session_id}}")
 def export_dataset(session_id: str, payload: ExportPayload, mode: str = "full") -> Response:
     session = _get_session(session_id)
     data = _compile_session(session, payload, mode=mode)
@@ -237,7 +252,7 @@ def export_dataset(session_id: str, payload: ExportPayload, mode: str = "full") 
     )
 
 
-@app.post("/api/publish/{session_id}", status_code=201)
+@app.post(f"{API_PREFIX}/publish/{{session_id}}", status_code=201)
 def publish_dataset(session_id: str, payload: ExportPayload) -> dict[str, Any]:
     session = _get_session(session_id)
     dataset_id = slugify(session.dataset_name, fallback="dataset")

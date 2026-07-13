@@ -6,6 +6,7 @@ const result = document.querySelector('#result');
 const metrics = document.querySelector('#metrics');
 const documentsRoot = document.querySelector('#documents');
 const toast = document.querySelector('#toast');
+const API_BASE = '/api/dataset-builder';
 let activeSession = null;
 
 function notify(message, error = false) {
@@ -78,7 +79,7 @@ form.addEventListener('submit', async event => {
   button.disabled = true;
   button.querySelector('span').textContent = '正在分析 Markdown…';
   try {
-    const response = await fetch('/api/analyze', { method: 'POST', body: new FormData(form) });
+    const response = await fetch(`${API_BASE}/analyze`, { method: 'POST', body: new FormData(form) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || '分析失败');
     render(data);
@@ -105,7 +106,7 @@ document.querySelectorAll('[data-mode]').forEach(button => button.addEventListen
   const mode = button.dataset.mode;
   button.disabled = true;
   try {
-    const response = await fetch(`/api/export/${activeSession.session_id}?mode=${mode}`, {
+    const response = await fetch(`${API_BASE}/export/${activeSession.session_id}?mode=${mode}`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({sidecars})
     });
     if (!response.ok) {
@@ -147,7 +148,7 @@ document.querySelector('#publish-button').addEventListener('click', async event 
   button.disabled = true;
   button.textContent = '正在发布…';
   try {
-    const response = await fetch(`/api/publish/${activeSession.session_id}`, {
+    const response = await fetch(`${API_BASE}/publish/${activeSession.session_id}`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({sidecars}),

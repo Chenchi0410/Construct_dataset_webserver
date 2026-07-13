@@ -28,7 +28,7 @@ cd C:\Users\sangzs1\Construct_dataset_webserver
 首次运行会创建 `.venv` 并安装 `requirements.txt`。然后访问：
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8000/dataset-builder/
 ```
 
 也可以手动启动：
@@ -41,10 +41,10 @@ python -m venv .venv
 
 ## API
 
-- `GET /api/health`：服务状态。
-- `POST /api/analyze`：上传 `pdf_files`、`md_files`，生成 Sidecar 草稿。
-- `POST /api/export/{session_id}?mode=full|sidecar|jsonl`：根据确认后的 Sidecar 导出 ZIP。
-- `POST /api/publish/{session_id}`：将完整评测集原子发布到共享目录；同名数据集不会被覆盖。
+- `GET /api/dataset-builder/health`：服务状态。
+- `POST /api/dataset-builder/analyze`：上传 `pdf_files`、`md_files`，生成 Sidecar 草稿。
+- `POST /api/dataset-builder/export/{session_id}?mode=full|sidecar|jsonl`：根据确认后的 Sidecar 导出 ZIP。
+- `POST /api/dataset-builder/publish/{session_id}`：将完整评测集原子发布到共享目录；同名数据集不会被覆盖。
 
 ## 发布到共享目录
 
