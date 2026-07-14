@@ -61,8 +61,14 @@ Ubuntu 示例：
 
 ```bash
 export SHARED_DATASET_DIR=/srv/md-platform/datasets
+export PARSEBENCH_ROOT=/opt/markdown-quality-platform/services/doc-eval
+export PARSEBENCH_PYTHON=/opt/markdown-quality-platform/services/doc-eval/.venv/bin/python
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
+
+`PARSEBENCH_PYTHON` 可以指向已安装 `parse_bench` 包的 Python 环境；此时不要求
+`PARSEBENCH_ROOT/src/parse_bench` 源码目录存在。统一部署会复用转换效果评测系统的
+Python 环境，确保构建规则和正式评测使用同一 ParseBench 版本。
 
 正式部署时建议在 systemd 服务的 `Environment=` 中设置该变量，并让数据集构建服务对目录具有写权限、评测服务具有只读权限。发布过程先写入共享目录内的 `.staging`，完成后再原子重命名；已有同名目录时会拒绝覆盖，因此新版本应使用新的数据集名称（例如 `department_contract_v2`）。
 

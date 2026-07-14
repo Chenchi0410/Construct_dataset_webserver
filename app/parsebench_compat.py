@@ -25,14 +25,15 @@ def _parsebench_python(root: Path) -> Path:
     configured = os.environ.get("PARSEBENCH_PYTHON")
     if configured:
         return Path(configured)
-    return root / ".venv" / "Scripts" / "python.exe"
+    executable = Path("Scripts/python.exe") if os.name == "nt" else Path("bin/python")
+    return root / ".venv" / executable
 
 
 def build_compatibility_profiles(markdowns: list[str]) -> list[dict[str, Any]]:
     """Extract rule bags with the exact ParseBench runtime used for evaluation."""
     root = DEFAULT_PARSEBENCH_ROOT.resolve()
     python = _parsebench_python(root)
-    if not (root / "src" / "parse_bench").is_dir():
+    if not (root / "src" / "parse_bench").is_dir() and not os.environ.get("PARSEBENCH_PYTHON"):
         raise ParseBenchCompatibilityError(
             f"ParseBench 源码目录不存在: {root}. 请设置 PARSEBENCH_ROOT。"
         )
@@ -150,7 +151,9 @@ def _extract_profile(markdown: str) -> dict[str, Any]:
 
 
 def _worker(root: Path) -> int:
-    sys.path.insert(0, str(root / "src"))
+    source_dir = root / "src" / "parse_bench"
+    if source_dir.is_dir():
+        sys.path.insert(0, str(root / "src"))
     request = json.load(sys.stdin)
     markdowns = request.get("markdowns")
     if not isinstance(markdowns, list) or not all(isinstance(item, str) for item in markdowns):
