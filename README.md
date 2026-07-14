@@ -28,7 +28,7 @@ cd C:\Users\sangzs1\Construct_dataset_webserver
 首次运行会创建 `.venv` 并安装 `requirements.txt`。然后访问：
 
 ```text
-http://127.0.0.1:8000/dataset-builder/
+http://127.0.0.1:8001/dataset-builder/
 ```
 
 也可以手动启动：
@@ -36,7 +36,7 @@ http://127.0.0.1:8000/dataset-builder/
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
 ## API
@@ -54,14 +54,14 @@ Windows PowerShell 示例：
 
 ```powershell
 $env:SHARED_DATASET_DIR = "D:\md-platform\datasets"
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
 Ubuntu 示例：
 
 ```bash
 export SHARED_DATASET_DIR=/srv/md-platform/datasets
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8102
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
 正式部署时建议在 systemd 服务的 `Environment=` 中设置该变量，并让数据集构建服务对目录具有写权限、评测服务具有只读权限。发布过程先写入共享目录内的 `.staging`，完成后再原子重命名；已有同名目录时会拒绝覆盖，因此新版本应使用新的数据集名称（例如 `department_contract_v2`）。

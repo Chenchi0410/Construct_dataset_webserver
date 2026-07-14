@@ -7,5 +7,5 @@ if (-not (Test-Path $VenvPython)) {
     & $VenvPython -m pip install -r (Join-Path $ProjectRoot "requirements.txt")
 }
 
-& $VenvPython -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir $ProjectRoot
+& $VenvPython -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --app-dir $ProjectRoot
 
