@@ -27,10 +27,67 @@ body {
 button, input, select, textarea { font: inherit; }
 
 .shell {
-  width: min(1180px, calc(100% - 40px));
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+  width: min(1500px, calc(100% - 40px));
   margin: 0 auto 48px;
   padding-top: 26px;
 }
+
+.workspace { min-width: 0; }
+
+.workflow-guide {
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  padding: 22px 20px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.workflow-guide-label { color: var(--primary); font-size: 12px; font-weight: 700; }
+.workflow-guide h2 { margin: 6px 0 22px; font-size: 20px; }
+.workflow-guide ol { margin: 0; padding: 0; list-style: none; }
+.workflow-guide li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 0 0 28px;
+}
+
+.workflow-guide li:last-child { padding-bottom: 0; }
+.workflow-guide li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 42px;
+  bottom: 2px;
+  left: 19px;
+  width: 1px;
+  background: #d8e1ec;
+}
+
+.workflow-guide li > span {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #93c5fd;
+  border-radius: 50%;
+  color: var(--primary-dark);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workflow-guide li > strong { padding-top: 8px; color: #374151; font-size: 13px; font-weight: 600; line-height: 1.6; }
 
 .page-heading { margin: 0 0 20px; }
 .page-heading h1 { margin: 0; font-size: 24px; line-height: 1.4; }
@@ -193,6 +250,11 @@ textarea { min-height: 340px; padding: 14px; resize: vertical; font: 12px/1.55 "
 button:focus-visible, label:focus-within { outline: 3px solid rgb(37 99 235 / 20%); outline-offset: 2px; }
 
 @media (max-width: 850px) {
+  .shell { grid-template-columns: 1fr; }
+  .workflow-guide { position: static; max-height: none; }
+  .workflow-guide ol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .workflow-guide li { padding-bottom: 0; }
+  .workflow-guide li:not(:last-child)::after { display: none; }
   .meta-grid { grid-template-columns: 1fr 1fr; }
   .metrics { grid-template-columns: 1fr 1fr; }
   .export-bar { flex-wrap: wrap; }
@@ -201,6 +263,7 @@ button:focus-visible, label:focus-within { outline: 3px solid rgb(37 99 235 / 20
 
 @media (max-width: 560px) {
   .shell { width: min(100% - 20px, 1180px); padding-top: 20px; }
+  .workflow-guide ol { grid-template-columns: 1fr; }
   .drop-grid, .meta-grid { grid-template-columns: 1fr; }
   .section-head { align-items: flex-start; gap: 10px; }
   .section-head > p { display: none; }
