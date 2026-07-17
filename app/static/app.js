@@ -53,8 +53,8 @@ function render(data) {
     metric(data.totals.formatting_rules, '格式规则'),
     metric(data.totals.tables, '表格'),
   ].join('');
-  documentsRoot.innerHTML = data.documents.map((doc, index) => `
-    <details class="document" ${index === 0 ? 'open' : ''} data-stem="${escapeHtml(doc.stem)}">
+  documentsRoot.innerHTML = data.documents.map(doc => `
+    <details class="document" data-stem="${escapeHtml(doc.stem)}">
       <summary>
         <div class="document-title"><strong>${escapeHtml(doc.pdf_name)}</strong><small>${escapeHtml(doc.md_name)}</small></div>
         <div class="rule-badges"><span>${doc.stats.content_rules} 内容</span><span>${doc.stats.formatting_rules} 格式</span><span>${doc.stats.tables} 表格</span></div>
